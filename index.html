@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Game Builder Studio</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <style>
+        :root { --bg-color: #f4f7f6; --primary: #007bff; --success: #28a745; --warning: #ffc107; --danger: #dc3545; --dark: #343a40; --gold: #ffd700; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: var(--bg-color); color: #333; }
+        
+        /* --- Auth Screen Styles --- */
+        #auth-screen { display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; background: #ebf0f1; }
+        .auth-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 320px; text-align: center; }
+        .auth-box h2 { margin-top: 0; color: var(--dark); }
+        .auth-box input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .auth-box button { width: 90%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.2s; }
+        .auth-box button:hover { background: #0056b3; }
+        .error-msg { color: var(--danger); font-size: 14px; margin-bottom: 10px; display: none; font-weight: bold; }
+        .toggle-auth { color: var(--primary); cursor: pointer; font-size: 14px; margin-top: 15px; display: block; text-decoration: underline; }
+
+        /* --- Main App Styles --- */
+        #app-screen { display: none; height: 100vh; flex-direction: column; }
+        header { background: var(--dark); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .token-display { background: rgba(255, 215, 0, 0.2); color: var(--gold); padding: 8px 15px; border-radius: 20px; font-weight: bold; border: 1px solid var(--gold); }
+        .btn-store { background: var(--warning); color: #333; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-store:hover { background: #e0a800; }
+        .btn-toggle { background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-toggle:hover { background: #138496; }
+        .btn-logout { background: var(--danger); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+        
+        /* --- Workspaces --- */
+        #editor-container { flex: 3; position: relative; display: flex; flex-direction: column; }
+        #blocklyDiv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #textEditor { display: none; width: 100%; height: 100%; box-sizing: border-box; resize: none; background: #1e1e1e; color: #d4d4d4; font-family: 'Courier New', Courier, monospace; font-size: 16px; padding: 20px; border: none; outline: none; line-height: 1.5; }
+
+        /* --- Sidebar & Output --- */
+        .sidebar { flex: 1; background: #fff; border-left: 2px solid #ddd; padding: 20px; display: flex; flex-direction: column; min-width: 250px; }
+        
+        /* AI Helper Widget */
+        .ai-widget { background: #eef2f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cdd4d9; }
+        .ai-widget select { width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        .ai-widget button { width: 100%; background: #6f42c1; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .ai-widget button:hover { background: #5a32a3; }
+
+        #run-btn { background: var(--success); color: white; border: none; padding: 15px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; }
+        #run-btn:hover { background: #218838; transform: translateY(-2px); }
+        #output { background: #000; color: #0f0; padding: 15px; flex: 1; border-radius: 5px; font-family: monospace; overflow-y: auto; font-size: 14px; border: 2px inset #555; }
+        .log-error { color: #ff4c4c; }
+        .log-info { color: #888; font-style: italic; }
+        .log-ai { color: #00d2ff; font-weight: bold; }
+
+        /* --- Store Modal --- */
+        #store-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .store-content { background: white; padding: 30px; border-radius: 12px; width: 450px; max-width: 90%; }
+        .store-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .close-store { cursor: pointer; font-size: 24px; font-weight: bold; color: var(--danger); }
+        .store-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; background: #fafafa; }
+        .store-item strong { display: block; font-size: 18px; }
+        .store-item span { color: #666; font-size: 14px; }
+        .buy-btn { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .buy-btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h2 id="auth-title">Sign In</h2>
+            <div id="error-message" class="error-msg"></div>
+            
+            <input type="email" id="email" placeholder="Email Address" required>
+            <input type="password" id="password" placeholder="Password (min 4 chars)" required>
+            <input type="number" id="age" placeholder="Your Age" style="display: none;" min="1" max="100">
+            
+            <button onclick="handleAuth()" id="auth-btn">Sign In</button>
+            <span class="toggle-auth" onclick="toggleAuthMode()">Need an account? Sign Up</span>
+        </div>
+    </div>
+
+    <div id="app-screen">
+        <header>
+            <h2>🚀 Studio: <span id="mode-badge">Block Mode</span></h2>
+            <div class="header-controls">
+                <div class="token-display" id="token-ui">🪙 0 Tokens</div>
+                <button class="btn-store" onclick="openStore()">🛒 AI Store</button>
+                <button class="btn-toggle" onclick="toggleEditorMode()" id="toggle-editor-btn">Text Mode</button>
+                <button class="btn-logout" onclick="logout()">Log Out</button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div id="editor-container">
+                <div id="blocklyDiv"></div>
+                <textarea id="textEditor" spellcheck="false" placeholder="// Write your JavaScript code here...&#10;console.log('Hello World!');"></textarea>
+            </div>
+            
+            <div class="sidebar">
+                
+                <div class="ai-widget">
+                    <h3 style="margin-top:0; color: #6f42c1;">🤖 Ask AI Helper</h3>
+                    <select id="ai-selector">
+                        <option value="none">-- No AI Selected --</option>
+                        </select>
+                    <button onclick="askAI()">Get a Hint!</button>
+                </div>
+                
+                <button id="run-btn" onclick="runCode()">▶ RUN CODE</button>
+                
+                <h4 style="margin-bottom: 5px;">Console Output:</h4>
+                <div id="output">Waiting for code...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="store-modal">
+        <div class="store-content">
+            <div class="store-header">
+                <h2 style="margin: 0;">🛒 AI Helper Store</h2>
+                <span class="close-store" onclick="closeStore()">&times;</span>
+            </div>
+            <p style="margin-top: 0;">Buy an AI to get hints while you code!</p>
+            
+            <div id="store-items-container">
+                </div>
+        </div>
+    </div>
+
+    <xml id="toolbox" style="display: none">
+        <category name="Logic" colour="%{BKY_LOGIC_HUE}">
+            <block type="controls_if"></block>
+            <block type="logic_compare"></block>
+        </category>
+        <category name="Loops" colour="%{BKY_LOOPS_HUE}">
+            <block type="controls_repeat_ext">
+                <value name="TIMES"><shadow type="math_number"><field name="NUM">10</field></shadow></value>
+            </block>
+        </category>
+        <category name="Math" colour="%{BKY_MATH_HUE}">
+            <block type="math_number"></block>
+            <block type="math_arithmetic"></block>
+        </category>
+        <category name="Text" colour="%{BKY_TEXTS_HUE}">
+            <block type="text"></block>
+            <block type="text_print"></block>
+        </category>
+    </xml>
+
+    <script>
+        /* --- STATE VARIABLES --- */
+        let isSignUpMode = false;
+        let isBlockMode = true;
+        let workspace = null;
+        
+        // Economy & Store State
+        let userTokens = 0;
+        let ownedAIs = [];
+        
+        const storeCatalog = [
+            { id: 'chatgpt', name: 'ChatGPT', price: 10, greeting: "Let's find the bug together!" },
+            { id: 'gemini', name: 'Gemini', price: 30, greeting: "I'll help you optimize this code." },
+            { id: 'bolt', name: 'Bolt', price: 30, greeting: "Speeding up your development!" },
+            { id: 'deepseek', name: 'DeepSeek 4.6', price: 45, greeting: "Analyzing logic structures..." },
+            { id: 'claude', name: 'Claude Opus 4.6', price: 60, greeting: "Thinking deeply about your game..." }
+        ];
+
+        const aiHints = [
+            "Hint: Are you sure your loop isn't running forever?",
+            "Hint: When using an IF block, make sure the condition can actually be met.",
+            "Hint: If switching to Text Mode, remember every statement usually ends with a semicolon (;).",
+            "Hint: Use the 'print' block to debug what value a variable holds at any given time.",
+            "Hint: Don't be afraid to break a big problem down into smaller, simpler blocks."
+        ];
+
+        /* --- AUTHENTICATION LOGIC --- */
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-title').innerText = isSignUpMode ? "Sign Up" : "Sign In";
+            document.getElementById('auth-btn').innerText = isSignUpMode ? "Create Account" : "Sign In";
+            document.getElementById('age').style.display = isSignUpMode ? "block" : "none";
+            document.querySelector('.toggle-auth').innerText = isSignUpMode ? "Already have an account? Sign In" : "Need an account? Sign Up";
+            document.getElementById('error-message').style.display = "none";
+        }
+
+        function handleAuth() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const age = document.getElementById('age').value;
+            const errorMsg = document.getElementById('error-message');
+
+            if (!email.includes('@') || password.length < 4) {
+                errorMsg.innerText = "Error: Use a valid email & a password (min 4 chars).";
+                errorMsg.style.display = "block";
+                return;
+            }
+
+            if (isSignUpMode) {
+                if (!age) {
+                    errorMsg.innerText = "Please enter your age!";
+                    errorMsg.style.display = "block";
+                    return;
+                }
+                if (parseInt(age) < 12) {
+                    alert("Age Restriction: Because you are under 12, a parent must help you create this account and agree to safety terms.");
+                    return; 
+                } else {
+                    alert("Sign up successful! You've been awarded 100 free tokens! 🪙");
+                    userTokens = 100; // Award 100 tokens on Sign Up!
+                }
+            } else {
+                // For prototype sake, let's say returning users have 20 tokens saved up
+                alert("Welcome back!");
+                if(userTokens === 0) userTokens = 20; 
+            }
+
+            updateTokenUI();
+
+            // Load App
+            document.getElementById('auth-screen').style.display = "none";
+            document.getElementById('app-screen').style.display = "flex";
+            
+            if (!workspace) initBlockly();
+            renderStore();
+        }
+
+        function logout() {
+            document.getElementById('app-screen').style.display = "none";
+            document.getElementById('auth-screen').style.display = "flex";
+            document.getElementById('password').value = ''; 
+        }
+
+        /* --- ECONOMY & AI HELPER LOGIC --- */
+        function updateTokenUI() {
+            document.getElementById('token-ui').innerText = `🪙 ${userTokens} Tokens`;
+        }
+
+        function openStore() {
+            renderStore();
+            document.getElementById('store-modal').style.display = 'flex';
+        }
+
+        function closeStore() {
+            document.getElementById('store-modal').style.display = 'none';
+        }
+
+        function renderStore() {
+            const container = document.getElementById('store-items-container');
+            container.innerHTML = '';
+
+            storeCatalog.forEach(ai => {
+                const isOwned = ownedAIs.includes(ai.id);
+                const canAfford = userTokens >= ai.price;
+                
+                let btnHtml = '';
+                if (isOwned) {
+                    btnHtml = `<button class="buy-btn" disabled style="background: #28a745;">Owned</button>`;
+                } else {
+                    btnHtml = `<button class="buy-btn" ${canAfford ? '' : 'disabled'} onclick="buyAI('${ai.id}', ${ai.price})">Buy for ${ai.price} 🪙</button>`;
+                }
+
+                container.innerHTML += `
+                    <div class="store-item">
+                        <div>
+                            <strong>${ai.name}</strong>
+                            <span>"<i>${ai.greeting}</i>"</span>
+                        </div>
+                        ${btnHtml}
+                    </div>
+                `;
+            });
+        }
+
+        function buyAI(aiId, price) {
+            if (userTokens >= price && !ownedAIs.includes(aiId)) {
+                userTokens -= price;
+                ownedAIs.push(aiId);
+                updateTokenUI();
+                renderStore();
+                updateAISelector();
+                alert(`Successfully purchased ${storeCatalog.find(a => a.id === aiId).name}!`);
+            }
+        }
+
+        function updateAISelector() {
+            const selector = document.getElementById('ai-selector');
+            selector.innerHTML = '<option value="none">-- Select an AI --</option>';
+            
+            ownedAIs.forEach(id => {
+                const ai = storeCatalog.find(a => a.id === id);
+                selector.innerHTML += `<option value="${ai.id}">${ai.name}</option>`;
+            });
+        }
+
+        function askAI() {
+            const selectedId = document.getElementById('ai-selector').value;
+            const outputDiv = document.getElementById('output');
+
+            if (selectedId === 'none') {
+                alert("Please select an AI from the dropdown first (or buy one in the store!).");
+                return;
+            }
+
+            const ai = storeCatalog.find(a => a.id === selectedId);
+            const randomHint = aiHints[Math.floor(Math.random() * aiHints.length)];
+            
+            // Print AI hint to the console output
+            const span = document.createElement('div');
+            span.innerHTML = `<span class="log-ai">[${ai.name}]:</span> ${randomHint}`;
+            outputDiv.appendChild(span);
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+
+        /* --- EDITOR MODE LOGIC --- */
+        function toggleEditorMode() {
+            const blocklyDiv = document.getElementById('blocklyDiv');
+            const textEditor = document.getElementById('textEditor');
+            const toggleBtn = document.getElementById('toggle-editor-btn');
+            const modeBadge = document.getElementById('mode-badge');
+
+            isBlockMode = !isBlockMode;
+
+            if (isBlockMode) {
+                blocklyDiv.style.display = "block";
+                textEditor.style.display = "none";
+                toggleBtn.innerText = "Text Mode";
+                modeBadge.innerText = "Block Mode";
+                Blockly.svgResize(workspace); 
+            } else {
+                blocklyDiv.style.display = "none";
+                textEditor.style.display = "block";
+                toggleBtn.innerText = "Block Mode";
+                modeBadge.innerText = "Text Mode";
+                
+                const generatedCode = Blockly.JavaScript.workspaceToCode(workspace);
+                if(generatedCode.trim() !== "") {
+                    textEditor.value = "// Auto-translated from your blocks!\n" + generatedCode;
+                }
+            }
+        }
+
+        // Proper text coding support
+        document.getElementById('textEditor').addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+            }
+        });
+
+        /* --- BLOCKLY INIT --- */
+        function initBlockly() {
+            workspace = Blockly.inject('blocklyDiv', {
+                toolbox: document.getElementById('toolbox'),
+                grid: {spacing: 20, length: 3, colour: '#ccc', snap: true},
+                trashcan: true
+            });
+            Blockly.JavaScript.INFINITE_LOOP_TRAP = 'if(--window.LoopTrap == 0) throw "Infinite loop detected!";\n';
+        }
+
+        /* --- CODE EXECUTION ENGINE --- */
+        function runCode() {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = ""; 
+            let codeToRun = isBlockMode ? Blockly.JavaScript.workspaceToCode(workspace) : document.getElementById('textEditor').value;
+
+            if (!codeToRun.trim()) {
+                outputDiv.innerHTML = "<span class='log-info'>No code to run. Write something first!</span>";
+                return;
+            }
+
+            if (isBlockMode) window.LoopTrap = 1000; 
+
+            const printToConsole = (msg) => {
+                const span = document.createElement('div');
+                span.textContent = `> ${msg}`;
+                outputDiv.appendChild(span);
+                outputDiv.scrollTop = outputDiv.scrollHeight; 
+            };
+
+            const originalLog = console.log;
+            const originalAlert = window.alert;
+            console.log = printToConsole;
+            window.alert = printToConsole;
+
+            try {
+                const executableFunction = new Function(codeToRun);
+                executableFunction();
+                outputDiv.innerHTML += `<br><span class='log-info'>--- Process completed normally ---</span>`;
+            } catch (error) {
+                outputDiv.innerHTML += `<br><span class='log-error'>❌ ERROR: ${error.message}</span>`;
+            } finally {
+                console.log = originalLog;
+                window.alert = originalAlert;
+            }
+        }
+    </script>
+</body>
+</html>
